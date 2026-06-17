@@ -63,7 +63,7 @@ class PaperTrader:
         }
         
         self.positions.append(position)
-        self.balance -= margin
+        # Don't deduct margin from balance — track it separately
         
         # Log entry
         trade_record = {
@@ -73,7 +73,7 @@ class PaperTrader:
             "price": signal.entry_price,
             "size": signal.size,
             "balance_before": balance_before,
-            "balance_after": self.balance,
+            "balance_after": balance_before,  # Balance unchanged on entry
             "type": "ENTRY",
             "setup": signal.setup_type,
             "score": signal.score,
@@ -138,7 +138,7 @@ class PaperTrader:
                     remaining.append(pos)
                 
                 balance_before = self.balance
-                self.balance += pos["margin"] + pnl
+                self.balance += pnl  # Only add P&L (margin was never deducted)
                 
                 # Record
                 exit_record = {
