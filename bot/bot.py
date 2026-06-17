@@ -350,6 +350,73 @@ async def cmd_startbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
+async def cmd_live(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Live positions with real-time P&L."""
+    if not paper_trader.positions:
+        await update.message.reply_text("No open positions.")
+        return
+    
+    prices = {}
+    for pos in paper_trader.positions:
+        p = bitget_market.get_price(pos["symbol"])
+        if p:
+            prices[pos["symbol"]] = p
+    
+    def fmt(p):
+        if p == 0: return "$0.00"
+        if p < 0.0001: return f"${p:.8f}"
+        if p < 0.01: return f"${p:.6f}"
+        if p < 1: return f"${p:.4f}"
+        return f"${p:.2f}"
+    
+    total_pnl = 0
+    winners = 0
+    losers = 0
+    
+    msg = f"**LIVE POSITIONS** - {len(paper_trader.positions)}\n\n"
+    
+    for pos in paper_trader.positions:
+        price = prices.get(pos["symbol"])
+        if not price:
+            msg += f"  {pos['symbol']}: price unavailable\n"
+            continue
+        
+        if pos["direction"] == "LONG":
+            pnl_pct = (price - pos["entry_price"]) / pos["entry_price"] * 100
+        else:
+            pnl_pct = (pos["entry_price"] - price) / pos["entry_price"] * 100
+        
+        pnl_dollar = pos["margin"] * paper_trader.leverage * pnl_pct / 100
+        total_pnl += pnl_dollar
+        
+        if pnl_pct > 0:
+            winners += 1
+        else:
+            losers += 1
+        
+        sl_dist = abs(price - pos["sl"]) / price * 100
+        tp_dist = abs(pos["tp1"] - price) / price * 100
+        tp1_hit = pos.get("tp1_hit", False)
+        
+        emoji = "W" if pnl_pct > 0 else "L"
+        msg += (
+            f"**{pos['symbol']} {pos['direction']}** [{emoji}]\n"
+            f"  Entry: {fmt(pos['entry_price'])} -> Current: {fmt(price)}\n"
+            f"  P&L: {pnl_pct:+.2f}% (${pnl_dollar:+.2f})\n"
+            f"  SL: {fmt(pos['sl'])} ({sl_dist:.1f}% away)\n"
+            f"  TP1: {fmt(pos['tp1'])} ({tp_dist:.1f}% away) {'[HIT]' if tp1_hit else ''}\n\n"
+        )
+    
+    msg += (
+        f"**TOTAL**\n"
+        f"Winners: {winners} | Losers: {losers}\n"
+        f"Unrealized P&L: ${total_pnl:+.2f}\n"
+        f"Balance: ${paper_trader.balance:.2f}"
+    )
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
 async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Close a specific position."""
     if not context.args:
@@ -436,7 +503,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"/daily - Today summary\n"
         f"/pnl - P&L breakdown\n"
         f"/risk - Risk exposure\n"
-        f"/top - Top coins\n"
+        f"/top - Top coins\n/live - Live P&L per position\n"
         f"/close COIN - Close position\n"
         f"/closeall - Close all\n"
         f"/status - Bot status\n"
@@ -575,6 +642,7 @@ def main():
     app.add_handler(CommandHandler("trades", cmd_trades))
     app.add_handler(CommandHandler("performance", cmd_performance))
     app.add_handler(CommandHandler("settings", cmd_settings))
+    app.add_handler(CommandHandler("live", cmd_live))
     app.add_handler(CommandHandler("close", cmd_close))
     app.add_handler(CommandHandler("closeall", cmd_closeall))
     app.add_handler(CommandHandler("status", cmd_status))
