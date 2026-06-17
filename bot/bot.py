@@ -729,6 +729,43 @@ def main():
         t.start()
         print(f"   Auto-scan started (background thread, {interval}s interval)", flush=True)
     
+    # Auto-start scan on boot
+    import threading
+    global running_scan
+    running_scan = True
+    interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
+    
+    def bg_scan_loop():
+        import time as _time
+        while running_scan:
+            try:
+                pairs = config.get("pairs", {})
+                symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
+                results = scanner.scan_multiple(symbols, config["scanner"]["candle_limits"], config["scanner"]["min_score"])
+                print(f"[AutoScan] {len(results)} results", flush=True)
+                if results:
+                    signals = decision.evaluate_batch(results, config, paper_trader.positions, paper_trader.risk_mgr.daily_pnl)
+                    print(f"[AutoScan] {len(signals)} signals", flush=True)
+                    for sig in signals:
+                        trade = paper_trader.open_position(sig)
+                        print(f"[AutoScan] {sig.symbol} {sig.direction} -> {trade.get('type', trade.get('status', '?'))}", flush=True)
+                if paper_trader.positions:
+                    prices = {}
+                    for pos in paper_trader.positions:
+                        p = bitget_market.get_price(pos["symbol"])
+                        if p:
+                            prices[pos["symbol"]] = p
+                    exits = paper_trader.check_exits(prices)
+                    for ex in exits:
+                        print(f"[AutoScan] EXIT: {ex['pair']} {ex['type']} pnl=${ex.get('pnl', 0):.2f}", flush=True)
+            except Exception as e:
+                print(f"[AutoScan] Error: {e}", flush=True)
+            _time.sleep(interval)
+    
+    t = threading.Thread(target=bg_scan_loop, daemon=True)
+    t.start()
+    print(f"   Auto-scan started ({interval}s interval)", flush=True)
+    
     app.run_polling()
 
 
