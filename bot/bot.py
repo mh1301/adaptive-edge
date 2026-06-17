@@ -85,7 +85,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Format results
         msg = f"📊 **SCAN RESULTS** - {len(results)} opportunities\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        for i, r in enumerate(results[:5], 1):
+        for i, r in enumerate(results[:10], 1):
             # Adaptive decimal places based on price magnitude
             def fmt(p):
                 if p == 0: return "$0.00"
