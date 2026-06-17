@@ -86,11 +86,18 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"📊 **SCAN RESULTS** - {len(results)} opportunities\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
         for i, r in enumerate(results[:5], 1):
+            # Adaptive decimal places based on price magnitude
+            def fmt(p):
+                if p == 0: return "$0.00"
+                if p < 0.0001: return f"${p:.8f}"
+                if p < 0.01: return f"${p:.6f}"
+                if p < 1: return f"${p:.4f}"
+                return f"${p:.2f}"
             msg += (
                 f"**{i}. {r['symbol']}** - Score: {r['score']}/100\n"
-                f"   Direction: {r['direction']} | Price: ${r['current_price']:.4f}\n"
-                f"   Entry: ${r['entry_zone']['low']:.4f} - ${r['entry_zone']['high']:.4f}\n"
-                f"   SL: ${r['sl']:.4f} | TP1: ${r['tp1']:.4f}\n"
+                f"   Direction: {r['direction']} | Price: {fmt(r['current_price'])}\n"
+                f"   Entry: {fmt(r['entry_zone']['low'])} - {fmt(r['entry_zone']['high'])}\n"
+                f"   SL: {fmt(r['sl'])} | TP1: {fmt(r['tp1'])}\n"
                 f"   RR: 1:{r['rr']} | Impulse: {r.get('impulse_direction', 'N/A')}\n\n"
             )
         
@@ -131,11 +138,17 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             direction = data.get('direction', 'N/A')
             msg += f"• {name}: {score} | {direction}\n"
         
+        def fmt(p):
+            if p == 0: return "$0.00"
+            if p < 0.0001: return f"${p:.8f}"
+            if p < 0.01: return f"${p:.6f}"
+            if p < 1: return f"${p:.4f}"
+            return f"${p:.2f}"
         msg += (
             f"\n**Setup:**\n"
-            f"Entry: ${result['entry_zone']['low']:.4f} - ${result['entry_zone']['high']:.4f}\n"
-            f"SL: ${result['sl']:.4f}\n"
-            f"TP1: ${result['tp1']:.4f} | TP2: ${result['tp2']:.4f}\n"
+            f"Entry: {fmt(result['entry_zone']['low'])} - {fmt(result['entry_zone']['high'])}\n"
+            f"SL: {fmt(result['sl'])}\n"
+            f"TP1: {fmt(result['tp1'])} | TP2: {fmt(result['tp2'])}\n"
             f"RR: 1:{result['rr']}"
         )
         
@@ -155,11 +168,17 @@ async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     msg = f"📊 **OPEN POSITIONS** - {len(status['positions'])}\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
     
+    def _fmt(p):
+        if p == 0: return "$0.00"
+        if p < 0.0001: return f"${p:.8f}"
+        if p < 0.01: return f"${p:.6f}"
+        if p < 1: return f"${p:.4f}"
+        return f"${p:.2f}"
     for pos in status["positions"]:
         msg += (
             f"**{pos['symbol']}** {pos['direction']}\n"
-            f"Entry: ${pos['entry_price']:.4f} | Size: {pos['size']}\n"
-            f"SL: ${pos['sl']:.4f} | TP1: ${pos['tp1']:.4f}\n"
+            f"Entry: {_fmt(pos['entry_price'])} | Size: {pos['size']}\n"
+            f"SL: {_fmt(pos['sl'])} | TP1: {_fmt(pos['tp1'])}\n"
             f"Score: {pos['score']} | Setup: {pos['setup']}\n\n"
         )
     
@@ -262,10 +281,16 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
                 trade = paper_trader.open_position(signal)
                 
                 if trade.get("status") != "REJECTED":
+                    def _fmt(p):
+                        if p == 0: return "$0.00"
+                        if p < 0.0001: return f"${p:.8f}"
+                        if p < 0.01: return f"${p:.6f}"
+                        if p < 1: return f"${p:.4f}"
+                        return f"${p:.2f}"
                     msg = (
                         f"✅ **ORDER FILLED** - {signal.symbol} {signal.direction}\n"
-                        f"Entry: ${signal.entry_price:.4f}\n"
-                        f"SL: ${signal.sl:.4f} | TP1: ${signal.tp1:.4f} | TP2: ${signal.tp2:.4f}\n"
+                        f"Entry: {_fmt(signal.entry_price)}\n"
+                        f"SL: {_fmt(signal.sl)} | TP1: {_fmt(signal.tp1)} | TP2: {_fmt(signal.tp2)}\n"
                         f"RR: 1:{signal.rr} | Score: {signal.score}/100\n"
                         f"Size: {signal.size} | Setup: {signal.setup_type}\n"
                         f"Balance: ${paper_trader.balance:.2f}"
