@@ -140,4 +140,5 @@ def analyze(candles: List[Dict], multi_tf_candles: Dict[str, List[Dict]] = None)
         }
     
     result["module"] = "impulse_system"
+    result["direction"] = result.get("combined_direction", "NEUTRAL")
     return result
