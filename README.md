@@ -101,15 +101,13 @@ Institution wants to BUY $100M
 
 ### Development Challenges
 
-1. **Small account problem** — $1000 balance can't open 1 BTC contract ($4,333 margin). Solved by implementing fractional contract sizing (0.001 minimum).
+1. **Bot blocking during scan** — Scanning 100 pairs takes 3-4 minutes, blocking all commands. Solved by running scan in background thread.
 
-2. **Bot blocking during scan** — Scanning 100 pairs takes 3-4 minutes, blocking all commands. Solved by running scan in background thread.
+2. **TP1 repeat firing** — After TP1 hit, price staying above TP1 triggered it again. Solved by adding `tp1_hit` flag per position.
 
-3. **TP1 repeat firing** — After TP1 hit, price staying above TP1 triggered it again. Solved by adding `tp1_hit` flag per position.
+3. **State persistence** — Positions lost on bot restart. Solved by saving state to `logs/state.json` on every change.
 
-4. **State persistence** — Positions lost on bot restart. Solved by saving state to `logs/state.json` on every change.
-
-5. **Price formatting** — PEPE ($0.00000298) displayed as $0.0000. Solved with adaptive decimal formatting.
+4. **Price formatting** — PEPE ($0.00000298) displayed as $0.0000. Solved with adaptive decimal formatting.
 
 ### What's Missing / Next Steps
 
@@ -134,8 +132,6 @@ Institution wants to BUY $100M
 2. **Risk management matters more than signals** — Elder's 2% + 6% rules saved us from blowing up during losing streaks.
 
 3. **Institutional footprint > lagging indicators** — Order Blocks and FVGs give earlier entries than RSI/MACD crossovers.
-
-4. **Paper trading reveals truth** — We thought score >= 60 would be profitable. Data showed score 14 = 88% WR but score 9 = 42% WR. Data > assumptions.
 
 ### Future of Agentic Trading
 
