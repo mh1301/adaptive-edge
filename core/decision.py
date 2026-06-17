@@ -175,13 +175,18 @@ def evaluate_batch(analyses: List[Dict], config: Dict, current_positions: List[D
     """
     signals = []
     
+    # Make a mutable copy so we can track positions opened in this batch
+    positions_snapshot = list(current_positions)
+    
     for analysis in analyses:
         if len(signals) >= max_signals:
             break
         
-        signal = evaluate_signal(analysis, config, current_positions, daily_pnl)
+        signal = evaluate_signal(analysis, config, positions_snapshot, daily_pnl)
         if signal:
             signals.append(signal)
+            # Add a placeholder so next evaluation sees updated count
+            positions_snapshot.append({"symbol": signal.symbol, "direction": signal.direction})
     
     return signals
 
