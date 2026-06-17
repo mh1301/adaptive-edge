@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
+import threading
 import json
 from datetime import datetime, timezone
 from typing import Dict, List
@@ -71,12 +72,15 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pairs = config.get("pairs", {})
         symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
         
-        # Scan
-        results = scanner.scan_multiple(
-            symbols,
-            config["scanner"]["candle_limits"],
-            config["scanner"]["min_score"],
-        )
+        # Scan in thread to avoid blocking
+        def do_scan():
+            return scanner.scan_multiple(
+                symbols,
+                config["scanner"]["candle_limits"],
+                config["scanner"]["min_score"],
+            )
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, do_scan)
         
         if not results:
             await update.message.reply_text("❌ No high-score opportunities found.")
