@@ -731,7 +731,6 @@ def main():
     
     # Auto-start scan on boot
     import threading
-    global running_scan
     running_scan = True
     interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
     
