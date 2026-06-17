@@ -84,6 +84,7 @@ python bot/bot.py
 | `/pnl` | P&L breakdown (realized vs unrealized) |
 | `/risk` | Risk exposure |
 | `/top` | Top coins by score |
+| `/live` | Live P\&L per position |
 | `/close <COIN>` | Close a position |
 | `/closeall` | Close all positions |
 | `/status` | Bot status |
