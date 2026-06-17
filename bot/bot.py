@@ -271,6 +271,7 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
         symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
         
         results = scanner.scan_multiple(symbols, config["scanner"]["candle_limits"], config["scanner"]["min_score"])
+        print(f"[AutoScan] scan_multiple returned {len(results)} results")
         
         if results:
             # Evaluate signals
@@ -279,10 +280,19 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
                 paper_trader.positions,
                 paper_trader.risk_mgr.daily_pnl,
             )
+            print(f"[AutoScan] evaluate_batch returned {len(signals)} signals")
+            
+            if not signals:
+                print(f"[AutoScan] No signals passed evaluation. Results had {len(results)} items.")
+                for r in results[:3]:
+                    print(f"  {r['symbol']}: score={r['score']} dir={r['direction']} impulse={r.get('impulse_direction','?')}")
             
             for signal in signals:
                 # Open paper trade
                 trade = paper_trader.open_position(signal)
+                print(f"[AutoScan] {signal.symbol} {signal.direction} score={signal.score} -> {trade.get('type', trade.get('status', '?'))}")
+                if trade.get("status") == "REJECTED":
+                    print(f"[AutoScan] REJECTED: {trade.get('reason', '?')}")
                 
                 if trade.get("status") != "REJECTED":
                     def _fmt(p):
@@ -324,6 +334,14 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=chat_id, text=f"⚠️ Auto-scan error: {e}")
 
 
+
+def register_scan_job(app_instance):
+    """Register the auto-scan job on the job queue."""
+    interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
+    existing = app_instance.job_queue.get_jobs_by_name("auto_scan")
+    if not existing:
+        app_instance.job_queue.run_repeating(auto_scan_task, interval=interval, first=5, name="auto_scan")
+        print(f"[Bot] Auto-scan registered (interval={interval}s)")
 async def cmd_startbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start auto-scanning."""
     global running_scan
@@ -336,14 +354,7 @@ async def cmd_startbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     running_scan = True
     
-    interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
-    context.job_queue.run_repeating(
-        auto_scan_task,
-        interval=interval,
-        first=5,
-        chat_id=update.effective_chat.id,
-        name="auto_scan",
-    )
+    register_scan_job(context.application)
     
     await update.message.reply_text(f"🤖 Auto-scan started! Interval: {interval}s")
 
@@ -657,6 +668,44 @@ def main():
     print("🤖 Adaptive Edge Bot started!")
     print(f"   Paper Balance: ${paper_trader.balance:.2f}")
     print(f"   Leverage: {paper_trader.leverage}x")
+    
+    # Auto-start scan if positions exist
+    if paper_trader.positions:
+        import threading
+        global running_scan
+        running_scan = True
+        interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
+        
+        def bg_scan_loop():
+            import time as _time
+            while running_scan:
+                try:
+                    pairs = config.get("pairs", {})
+                    symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
+                    results = scanner.scan_multiple(symbols, config["scanner"]["candle_limits"], config["scanner"]["min_score"])
+                    print(f"[AutoScan] {len(results)} results", flush=True)
+                    if results:
+                        signals = decision.evaluate_batch(results, config, paper_trader.positions, paper_trader.risk_mgr.daily_pnl)
+                        print(f"[AutoScan] {len(signals)} signals", flush=True)
+                        for sig in signals:
+                            trade = paper_trader.open_position(sig)
+                            print(f"[AutoScan] {sig.symbol} {sig.direction} -> {trade.get('type', trade.get('status', '?'))}", flush=True)
+                    if paper_trader.positions:
+                        prices = {}
+                        for pos in paper_trader.positions:
+                            p = bitget_market.get_price(pos["symbol"])
+                            if p:
+                                prices[pos["symbol"]] = p
+                        exits = paper_trader.check_exits(prices)
+                        for ex in exits:
+                            print(f"[AutoScan] EXIT: {ex['pair']} {ex['type']} pnl=${ex.get('pnl', 0):.2f}", flush=True)
+                except Exception as e:
+                    print(f"[AutoScan] Error: {e}", flush=True)
+                _time.sleep(interval)
+        
+        t = threading.Thread(target=bg_scan_loop, daemon=True)
+        t.start()
+        print(f"   Auto-scan started (background thread, {interval}s interval)", flush=True)
     
     app.run_polling()
 

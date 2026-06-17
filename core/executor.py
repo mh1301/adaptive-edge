@@ -76,8 +76,8 @@ class PaperTrader:
         margin = signal.entry_price * signal.size / self.leverage
         if margin > self.balance * 0.5:  # Don't use more than 50% of balance
             margin = self.balance * 0.3
-            signal.size = int(margin * self.leverage / signal.entry_price)
-            if signal.size < 1:
+            signal.size = round(margin * self.leverage / signal.entry_price, 4)
+            if signal.size < 0.0001:
                 return {"status": "REJECTED", "reason": "Insufficient balance for minimum contract"}
         
         balance_before = self.balance
