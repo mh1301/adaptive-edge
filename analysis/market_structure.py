@@ -255,7 +255,13 @@ def analyze(candles: List[Dict]) -> Dict:
         }
     """
     if len(candles) < 10:
-        return {"trend": "neutral", "score": 0, "direction": "NEUTRAL"}
+        return {
+            "trend": "neutral", "swing_highs": [], "swing_lows": [],
+            "structure": {"trend": "neutral", "sequence": [], "last_high": None, "last_low": None,
+                          "hh_count": 0, "hl_count": 0, "lh_count": 0, "ll_count": 0},
+            "bms_events": [], "choch_events": [],
+            "score": 0, "direction": "NEUTRAL",
+        }
     
     swing_highs, swing_lows = find_swing_points(candles, lookback=2)
     structure = map_structure(swing_highs, swing_lows)

@@ -298,6 +298,13 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
 async def cmd_startbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start auto-scanning."""
     global running_scan
+    
+    # Prevent duplicate jobs
+    existing = context.job_queue.get_jobs_by_name("auto_scan")
+    if existing:
+        await update.message.reply_text("⚠️ Auto-scan already running! Use /stopbot first.")
+        return
+    
     running_scan = True
     
     interval = config.get("scanner", {}).get("scan_interval_seconds", 300)

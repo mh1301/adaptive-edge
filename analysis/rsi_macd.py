@@ -16,18 +16,24 @@ def _ema(data: List[float], period: int) -> List[float]:
 
 
 def _rsi(closes: List[float], period: int = 14) -> float:
-    """Calculate RSI."""
+    """Calculate RSI using Wilder's smoothing method."""
     if len(closes) < period + 1:
         return 50
     
     deltas = [closes[i] - closes[i-1] for i in range(1, len(closes))]
-    recent = deltas[-period:]
     
-    gains = [d for d in recent if d > 0]
-    losses = [-d for d in recent if d < 0]
+    # Initial average gain/loss from first `period` deltas
+    gains = [d if d > 0 else 0 for d in deltas[:period]]
+    losses = [-d if d < 0 else 0 for d in deltas[:period]]
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
     
-    avg_gain = sum(gains) / period if gains else 0
-    avg_loss = sum(losses) / period if losses else 0
+    # Wilder's smoothing for remaining deltas
+    for d in deltas[period:]:
+        gain = d if d > 0 else 0
+        loss = -d if d < 0 else 0
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
     
     if avg_loss == 0:
         return 100

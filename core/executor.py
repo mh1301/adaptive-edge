@@ -111,14 +111,14 @@ class PaperTrader:
                     exit_type = "EXIT_SL"
                 elif price >= pos["tp2"]:
                     exit_type = "EXIT_TP2"
-                elif price >= pos["tp1"]:
+                elif price >= pos["tp1"] and not pos.get("tp1_hit"):
                     exit_type = "EXIT_TP1"
             else:  # SHORT
                 if price >= pos["sl"]:
                     exit_type = "EXIT_SL"
                 elif price <= pos["tp2"]:
                     exit_type = "EXIT_TP2"
-                elif price <= pos["tp1"]:
+                elif price <= pos["tp1"] and not pos.get("tp1_hit"):
                     exit_type = "EXIT_TP1"
             
             if exit_type:
@@ -133,8 +133,11 @@ class PaperTrader:
                 # For TP1, only close 50%
                 if exit_type == "EXIT_TP1":
                     pnl = pnl * 0.5
-                    # Keep position but update SL to breakeven
+                    # Keep position but update SL to breakeven and halve size/margin
                     pos["sl"] = pos["entry_price"]
+                    pos["margin"] = pos["margin"] * 0.5
+                    pos["size"] = max(1, pos["size"] // 2)
+                    pos["tp1_hit"] = True  # Mark TP1 as taken
                     remaining.append(pos)
                 
                 balance_before = self.balance

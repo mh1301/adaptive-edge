@@ -48,7 +48,7 @@ def analyze(candles: List[Dict]) -> Dict:
     bsl = levels["bsl_pools"]
     ssl = levels["ssl_pools"]
     
-    current_price = candles[-1]["close"] if candles else 0
+    current_price = candles[-1]["close"] if candles else 0.0001  # Avoid zero division
     
     # Check proximity to liquidity pools
     nearest_bsl = None

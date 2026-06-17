@@ -82,11 +82,16 @@ def calculate_performance(trades: List[Dict] = None) -> Dict:
     # Calculate P&L per completed trade
     pnls = []
     for exit_trade in exits:
-        symbol = exit_trade.get("pair", "") or exit_trade.get("symbol", "")
-        entry = entries.get(symbol)
-        if entry:
-            pnl = exit_trade.get("balance_after", 0) - entry.get("balance_before", 0)
+        pnl = exit_trade.get("pnl", 0)
+        if pnl != 0:
             pnls.append(pnl)
+        else:
+            # Fallback: calculate from balance diff
+            symbol = exit_trade.get("pair", "") or exit_trade.get("symbol", "")
+            entry = entries.get(symbol)
+            if entry:
+                pnl = exit_trade.get("balance_after", 0) - entry.get("balance_after", entry.get("balance_before", 0))
+                pnls.append(pnl)
     
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p < 0]

@@ -13,7 +13,7 @@ def get(key: str) -> Optional[List[Dict]]:
     """Get cached data if not expired."""
     if key in _cache:
         entry = _cache[key]
-        if time.time() - entry["ts"] < DEFAULT_TTL:
+        if time.time() - entry["ts"] < entry.get("ttl", DEFAULT_TTL):
             return entry["data"]
         del _cache[key]
     return None
