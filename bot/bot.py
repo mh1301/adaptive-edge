@@ -348,6 +348,192 @@ async def cmd_startbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🤖 Auto-scan started! Interval: {interval}s")
 
 
+
+
+async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close a specific position."""
+    if not context.args:
+        await update.message.reply_text("Usage: /close SOLUSDT")
+        return
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    found = any(p["symbol"] == symbol for p in paper_trader.positions)
+    if not found:
+        await update.message.reply_text(f"No open position for {symbol}")
+        return
+    price = binance_feed.get_price(symbol)
+    if not price:
+        await update.message.reply_text(f"Can't get price for {symbol}")
+        return
+    result = paper_trader.close_position(symbol, price)
+    if result:
+        emoji = "TP" in result["type"] and "🎯" or "❌"
+        msg = (
+            f"{emoji} **CLOSED** - {symbol} {result['side']}\n"
+            f"Entry: ${result['entry_price']:.4f} -> Exit: ${result['price']:.4f}\n"
+            f"P&L: ${result['pnl']:+.2f}\n"
+            f"Balance: ${result['balance_after']:.2f}"
+        )
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(f"Failed to close {symbol}")
+
+async def cmd_closeall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close all open positions."""
+    if not paper_trader.positions:
+        await update.message.reply_text("No open positions to close.")
+        return
+    prices = {}
+    for pos in paper_trader.positions:
+        p = binance_feed.get_price(pos["symbol"])
+        if p:
+            prices[pos["symbol"]] = p
+    closed = paper_trader.close_all(prices)
+    if closed:
+        total_pnl = sum(c["pnl"] for c in closed)
+        msg = f"**CLOSED ALL** - {len(closed)} positions\n\n"
+        for c in closed:
+            msg += f"{c['pair']}: ${c['pnl']:+.2f}\n"
+        msg += f"\n**Total P&L: ${total_pnl:+.2f}**\nBalance: ${paper_trader.balance:.2f}"
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    else:
+        await update.message.reply_text("Failed to close positions.")
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bot status overview."""
+    status = paper_trader.get_status()
+    perf = journal.calculate_performance()
+    risk = status["risk_status"]
+    scan_status = "Running" if running_scan else "Stopped"
+    interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
+    pairs = sum(len(v) for v in config.get("pairs", {}).values())
+    msg = (
+        f"**BOT STATUS**\n"
+        f"Scanner: {scan_status} ({interval//60}min)\n"
+        f"Pairs: {pairs} | Min Score: {config['scanner']['min_score']}\n\n"
+        f"Balance: ${status['balance']:.2f}\n"
+        f"Positions: {status['open_positions']}/{config['trading']['max_positions']}\n"
+        f"Margin: ${status['total_margin']:.2f}\n\n"
+        f"Trades: {perf['total_trades']} | WR: {perf['win_rate']}%\n"
+        f"Total P&L: ${perf['total_pnl']:+.2f}\n\n"
+        f"Risk: {'OK' if risk['can_trade'] else 'BLOCKED - ' + risk['reason']}\n"
+        f"Daily P&L: ${risk['daily_pnl']:+.2f} | Losses: {risk['consecutive_losses']}"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """List all commands."""
+    msg = (
+        f"**COMMANDS**\n"
+        f"/start - Overview\n"
+        f"/scan - Scan market\n"
+        f"/analyze COIN - Deep analysis\n"
+        f"/positions - Open positions\n"
+        f"/balance - Account balance\n"
+        f"/trades - Recent trades\n"
+        f"/performance - Stats\n"
+        f"/daily - Today summary\n"
+        f"/pnl - P&L breakdown\n"
+        f"/risk - Risk exposure\n"
+        f"/top - Top coins\n"
+        f"/close COIN - Close position\n"
+        f"/closeall - Close all\n"
+        f"/status - Bot status\n"
+        f"/settings - Config\n"
+        f"/startbot - Start auto-scan\n"
+        f"/stopbot - Stop auto-scan\n"
+        f"/help - This message"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Daily summary."""
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    trades = journal.get_trades(1000)
+    today_trades = [t for t in trades if t.get("timestamp", "").startswith(today)]
+    entries = [t for t in today_trades if t["type"] == "ENTRY"]
+    exits = [t for t in today_trades if "EXIT" in t["type"]]
+    wins = sum(1 for t in exits if t.get("pnl", 0) > 0)
+    losses = sum(1 for t in exits if t.get("pnl", 0) < 0)
+    total_pnl = sum(t.get("pnl", 0) for t in exits)
+    wr = (wins / len(exits) * 100) if exits else 0
+    msg = (
+        f"**DAILY - {today}**\n"
+        f"Entries: {len(entries)}\n"
+        f"Exits: {len(exits)} ({wins}W / {losses}L)\n"
+        f"Win Rate: {wr:.1f}%\n"
+        f"Realized P&L: ${total_pnl:+.2f}\n"
+        f"Open: {len(paper_trader.positions)}"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """P&L breakdown."""
+    perf = journal.calculate_performance()
+    status = paper_trader.get_status()
+    prices = {}
+    for pos in paper_trader.positions:
+        p = binance_feed.get_price(pos["symbol"])
+        if p:
+            prices[pos["symbol"]] = p
+    unrealized = paper_trader.get_unrealized_pnl(prices)
+    total = perf["total_pnl"] + unrealized
+    msg = (
+        f"**P&L BREAKDOWN**\n"
+        f"Realized: ${perf['total_pnl']:+.2f} ({perf['total_trades']} trades)\n"
+        f"Unrealized: ${unrealized:+.2f} ({len(paper_trader.positions)} pos)\n"
+        f"\n**Total: ${total:+.2f}**\n"
+        f"Balance: ${status['balance']:.2f} | Margin: ${status['total_margin']:.2f}"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Risk exposure."""
+    status = paper_trader.get_status()
+    risk = status["risk_status"]
+    max_pos = config["trading"]["max_positions"]
+    max_loss_pct = config["risk"]["max_daily_loss_pct"]
+    margin_pct = (status["total_margin"] / status["balance"] * 100) if status["balance"] > 0 else 0
+    msg = (
+        f"**RISK EXPOSURE**\n"
+        f"Positions: {status['open_positions']}/{max_pos}\n"
+        f"Margin: ${status['total_margin']:.2f} ({margin_pct:.1f}%)\n"
+        f"Leverage: {config['trading']['leverage']}x\n"
+        f"Daily Limit: {max_loss_pct}% (${status['balance'] * max_loss_pct / 100:.2f})\n"
+        f"Daily P&L: ${risk['daily_pnl']:+.2f}\n"
+        f"Losses: {risk['consecutive_losses']}/{config['risk']['circuit_breaker_losses']}\n"
+        f"Can Trade: {'YES' if risk['can_trade'] else 'NO - ' + risk['reason']}"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Top coins by score."""
+    await update.message.reply_text("Scanning top coins...")
+    try:
+        pairs = config.get("pairs", {})
+        symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
+        def do_scan():
+            return scanner.scan_multiple(symbols, config["scanner"]["candle_limits"], 50)
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, do_scan)
+        if not results:
+            await update.message.reply_text("No coins scored above 50.")
+            return
+        def fmt(p):
+            if p == 0: return "$0.00"
+            if p < 0.0001: return f"${p:.8f}"
+            if p < 0.01: return f"${p:.6f}"
+            if p < 1: return f"${p:.4f}"
+            return f"${p:.2f}"
+        msg = f"**TOP COINS** - {len(results)} above 50\n\n"
+        for i, r in enumerate(results[:5], 1):
+            msg += f"**{i}. {r['symbol']}** - {r['score']}/100 {r['direction']} | {fmt(r['current_price'])}\n"
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
+
 async def cmd_stopbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Stop auto-scanning."""
     global running_scan
@@ -389,6 +575,14 @@ def main():
     app.add_handler(CommandHandler("trades", cmd_trades))
     app.add_handler(CommandHandler("performance", cmd_performance))
     app.add_handler(CommandHandler("settings", cmd_settings))
+    app.add_handler(CommandHandler("close", cmd_close))
+    app.add_handler(CommandHandler("closeall", cmd_closeall))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("daily", cmd_daily))
+    app.add_handler(CommandHandler("pnl", cmd_pnl))
+    app.add_handler(CommandHandler("risk", cmd_risk))
+    app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("startbot", cmd_startbot))
     app.add_handler(CommandHandler("stopbot", cmd_stopbot))
     

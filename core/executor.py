@@ -165,6 +165,67 @@ class PaperTrader:
         self.positions = remaining
         return exits
     
+
+    def close_position(self, symbol: str, current_price: float) -> Dict:
+        """Manually close a position at current price."""
+        remaining = []
+        closed = None
+        
+        for pos in self.positions:
+            if pos["symbol"] == symbol:
+                # Calculate P&L
+                if pos["direction"] == "LONG":
+                    pnl_pct = (current_price - pos["entry_price"]) / pos["entry_price"]
+                else:
+                    pnl_pct = (pos["entry_price"] - current_price) / pos["entry_price"]
+                
+                pnl = pos["margin"] * self.leverage * pnl_pct
+                balance_before = self.balance
+                self.balance += pnl
+                
+                closed = {
+                    "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+                    "pair": symbol,
+                    "side": pos["direction"],
+                    "price": current_price,
+                    "size": pos["size"],
+                    "balance_before": balance_before,
+                    "balance_after": self.balance,
+                    "type": "EXIT_MANUAL",
+                    "pnl": round(pnl, 2),
+                    "entry_price": pos["entry_price"],
+                }
+                journal.log_trade(closed)
+                self.risk_mgr.record_trade(pnl)
+            else:
+                remaining.append(pos)
+        
+        self.positions = remaining
+        return closed
+    
+    def close_all(self, current_prices: Dict[str, float]) -> list:
+        """Close all positions."""
+        closed = []
+        for symbol in list(current_prices.keys()):
+            result = self.close_position(symbol, current_prices.get(symbol, 0))
+            if result:
+                closed.append(result)
+        return closed
+
+    def get_unrealized_pnl(self, current_prices: Dict[str, float]) -> float:
+        """Calculate unrealized P&L from open positions."""
+        total = 0
+        for pos in self.positions:
+            price = current_prices.get(pos["symbol"])
+            if price is None:
+                continue
+            if pos["direction"] == "LONG":
+                pnl_pct = (price - pos["entry_price"]) / pos["entry_price"]
+            else:
+                pnl_pct = (pos["entry_price"] - price) / pos["entry_price"]
+            total += pos["margin"] * self.leverage * pnl_pct
+        return total
+
     def get_status(self) -> Dict:
         """Get current paper trading status."""
         total_margin = sum(p["margin"] for p in self.positions)
