@@ -2,6 +2,140 @@
 
 **Bitget Base Camp Hackathon S1 — Track 1: Trading Agent**
 
+## Quick Start
+
+### Prerequisites
+- Python 3.10+
+- Bitget account (https://www.bitget.com)
+- Telegram bot token (from @BotFather)
+
+### Step 1: Clone & Install
+```bash
+git clone https://github.com/mh1301/adaptive-edge.git
+cd adaptive-edge
+pip install -r requirements.txt
+```
+
+### Step 2: Get Bitget API Keys
+1. Go to https://www.bitget.com -> Log in
+2. Go to API Management (Settings -> API)
+3. Create API key with **Trade** permission
+4. Save the API Key, Secret Key, and Passphrase
+
+### Step 3: Get Telegram Bot Token
+1. Open Telegram, search @BotFather
+2. Send `/newbot`, follow prompts
+3. Copy the bot token (format: `123456:ABC-DEF...`)
+
+### Step 4: Configure .env
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+```
+BITGET_API_KEY=your_api_key_here
+BITGET_API_SECRET=your_secret_key_here
+BITGET_API_PASSPHRASE=your_passphrase_here
+DRY_RUN=true
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_CHAT_ID=your_telegram_chat_id
+```
+
+To find your Telegram Chat ID: send any message to @userinfobot on Telegram.
+
+### Step 5: Run
+```bash
+python bot/bot.py
+```
+
+You should see:
+```
+Adaptive Edge Bot started!
+Paper Balance: $1000.00
+Leverage: 15x
+Auto-scan started (300s interval)
+```
+
+### Step 6: Use the Bot
+Open your Telegram bot and send `/help` to see all commands.
+Send `/scan` to manually scan the market.
+The bot auto-scans every 5 minutes and opens positions automatically.
+
+### Notes
+- `DRY_RUN=true` = paper trading (no real money)
+- Set `DRY_RUN=false` for live trading (real money!)
+- Logs are saved to `logs/trades.jsonl`
+- State (positions, balance) saved to `logs/state.json`
+
+
+---
+
+## Architecture
+
+```
+                    +------------------+
+                    |  Bitget API      |
+                    |  (100 pairs)     |
+                    +--------+---------+
+                             |
+                    +--------v---------+
+                    |  Data Feed        |
+                    |  (OHLCV 1H/4H/15M)|
+                    +--------+---------+
+                             |
+              +--------------+--------------+
+              |              |              |
+     +--------v---+  +------v------+  +----v--------+
+     | Market      |  | Order       |  | Fibonacci   |
+     | Structure   |  | Blocks      |  | Levels      |
+     +--------+---+  +------+------+  +----+--------+
+              |              |              |
+     +--------v---+  +------v------+  +----v--------+
+     | Supply &    |  | Fair Value  |  | Liquidity   |
+     | Demand      |  | Gaps        |  | Pools       |
+     +--------+---+  +------+------+  +----+--------+
+              |              |              |
+     +--------v---+  +------v------+  +----v--------+
+     | Impulse     |  | RSI + MACD  |  | Volume      |
+     | System      |  |             |  | Analysis    |
+     +--------+---+  +------+------+  +----+--------+
+              |              |              |
+     +--------v---+  +------v------+  +----v--------+
+     | Candlestick |  | AMD         |  | Scoring     |
+     | Patterns    |  | Cycle       |  | Engine      |
+     +--------+---+  +------+------+  +----+--------+
+              |              |              |
+              +--------------+--------------+
+                             |
+                    +--------v---------+
+                    |  Decision Engine  |
+                    |  (Score >= 60?)   |
+                    +--------+---------+
+                             |
+                    +--------v---------+
+                    |  Risk Manager     |
+                    |  (2% + 6% rule)   |
+                    +--------+---------+
+                             |
+                    +--------v---------+
+                    |  Executor         |
+                    |  (Paper/Live)     |
+                    +--------+---------+
+                             |
+              +--------------+--------------+
+              |                             |
+     +--------v---+               +--------v---+
+     | Journal     |               | Telegram    |
+     | (trades.jsonl)|             | Bot (19 cmds)|
+     +-------------+               +-------------+
+
+     11 Modules Score 0-100 -> Min 60 -> Risk Check -> Entry
+```
+
+
+---
+
 ## 1. Idea — Why We Built This
 
 ### The Problem
@@ -143,6 +277,9 @@ AI Agents will replace manual chart analysis. The edge is in:
 
 The human role shifts from "chart reader" to "strategy designer" — define the rules, let the Agent execute.
 
+
+---
+
 ## Adaptive Edge vs Traditional Trading Bots
 
 | Feature | Traditional Bot | Adaptive Edge |
@@ -164,133 +301,8 @@ The human role shifts from "chart reader" to "strategy designer" — define the 
 
 **Key differentiator:** Traditional bots react to price AFTER it moves. Adaptive Edge reads institutional footprints BEFORE the move completes.
 
-## Architecture
 
-```
-                    +------------------+
-                    |  Bitget API      |
-                    |  (100 pairs)     |
-                    +--------+---------+
-                             |
-                    +--------v---------+
-                    |  Data Feed        |
-                    |  (OHLCV 1H/4H/15M)|
-                    +--------+---------+
-                             |
-              +--------------+--------------+
-              |              |              |
-     +--------v---+  +------v------+  +----v--------+
-     | Market      |  | Order       |  | Fibonacci   |
-     | Structure   |  | Blocks      |  | Levels      |
-     +--------+---+  +------+------+  +----+--------+
-              |              |              |
-     +--------v---+  +------v------+  +----v--------+
-     | Supply &    |  | Fair Value  |  | Liquidity   |
-     | Demand      |  | Gaps        |  | Pools       |
-     +--------+---+  +------+------+  +----+--------+
-              |              |              |
-     +--------v---+  +------v------+  +----v--------+
-     | Impulse     |  | RSI + MACD  |  | Volume      |
-     | System      |  |             |  | Analysis    |
-     +--------+---+  +------+------+  +----+--------+
-              |              |              |
-     +--------v---+  +------v------+  +----v--------+
-     | Candlestick |  | AMD         |  | Scoring     |
-     | Patterns    |  | Cycle       |  | Engine      |
-     +--------+---+  +------+------+  +----+--------+
-              |              |              |
-              +--------------+--------------+
-                             |
-                    +--------v---------+
-                    |  Decision Engine  |
-                    |  (Score >= 60?)   |
-                    +--------+---------+
-                             |
-                    +--------v---------+
-                    |  Risk Manager     |
-                    |  (2% + 6% rule)   |
-                    +--------+---------+
-                             |
-                    +--------v---------+
-                    |  Executor         |
-                    |  (Paper/Live)     |
-                    +--------+---------+
-                             |
-              +--------------+--------------+
-              |                             |
-     +--------v---+               +--------v---+
-     | Journal     |               | Telegram    |
-     | (trades.jsonl)|             | Bot (19 cmds)|
-     +-------------+               +-------------+
-
-     11 Modules Score 0-100 -> Min 60 -> Risk Check -> Entry
-```
-
-## Quick Start
-
-### Prerequisites
-- Python 3.10+
-- Bitget account (https://www.bitget.com)
-- Telegram bot token (from @BotFather)
-
-### Step 1: Clone & Install
-```bash
-git clone https://github.com/mh1301/adaptive-edge.git
-cd adaptive-edge
-pip install -r requirements.txt
-```
-
-### Step 2: Get Bitget API Keys
-1. Go to https://www.bitget.com -> Log in
-2. Go to API Management (Settings -> API)
-3. Create API key with **Trade** permission
-4. Save the API Key, Secret Key, and Passphrase
-
-### Step 3: Get Telegram Bot Token
-1. Open Telegram, search @BotFather
-2. Send `/newbot`, follow prompts
-3. Copy the bot token (format: `123456:ABC-DEF...`)
-
-### Step 4: Configure .env
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your credentials:
-```
-BITGET_API_KEY=your_api_key_here
-BITGET_API_SECRET=your_secret_key_here
-BITGET_API_PASSPHRASE=your_passphrase_here
-DRY_RUN=true
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_telegram_chat_id
-```
-
-To find your Telegram Chat ID: send any message to @userinfobot on Telegram.
-
-### Step 5: Run
-```bash
-python bot/bot.py
-```
-
-You should see:
-```
-Adaptive Edge Bot started!
-Paper Balance: $1000.00
-Leverage: 15x
-Auto-scan started (300s interval)
-```
-
-### Step 6: Use the Bot
-Open your Telegram bot and send `/help` to see all commands.
-Send `/scan` to manually scan the market.
-The bot auto-scans every 5 minutes and opens positions automatically.
-
-### Notes
-- `DRY_RUN=true` = paper trading (no real money)
-- Set `DRY_RUN=false` for live trading (real money!)
-- Logs are saved to `logs/trades.jsonl`
-- State (positions, balance) saved to `logs/state.json`
+---
 
 ## Telegram Bot Commands
 
