@@ -136,7 +136,7 @@ adaptive-edge/
 |   +-- journal.py       # Trade logging + performance
 +-- analysis/            # 11 analysis modules
 +-- data/
-|   +-- binance_feed.py  # Bitget public market data
+|   +-- bitget_market.py # Bitget public market data
 |   +-- bitget_feed.py   # Bitget authenticated API
 +-- bot/
 |   +-- bot.py           # Telegram bot (18 commands)

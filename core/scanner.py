@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import Dict, List, Optional
-from data import binance_feed
+from data import bitget_market
 from analysis import (
     market_structure,
     supply_demand,
@@ -63,7 +63,7 @@ def analyze_single(symbol: str, timeframes: Dict[str, int] = None) -> Dict:
         timeframes = {"4h": 50, "1h": 100, "15m": 50}
     
     # Fetch multi-timeframe data
-    multi_tf = binance_feed.get_multi_tf_data(symbol, timeframes)
+    multi_tf = bitget_market.get_multi_tf_data(symbol, timeframes)
     
     # Use 1h for main analysis (most balanced)
     candles_1h = multi_tf.get("1h", [])

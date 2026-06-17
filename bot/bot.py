@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 from core import scanner, decision, journal, risk_manager
 from core.executor import PaperTrader
-from data import binance_feed
+from data import bitget_market
 
 load_dotenv()
 
@@ -305,7 +305,7 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
         if paper_trader.positions:
             prices = {}
             for pos in paper_trader.positions:
-                price = binance_feed.get_price(pos["symbol"])
+                price = bitget_market.get_price(pos["symbol"])
                 if price:
                     prices[pos["symbol"]] = price
             
@@ -362,7 +362,7 @@ async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not found:
         await update.message.reply_text(f"No open position for {symbol}")
         return
-    price = binance_feed.get_price(symbol)
+    price = bitget_market.get_price(symbol)
     if not price:
         await update.message.reply_text(f"Can't get price for {symbol}")
         return
@@ -386,7 +386,7 @@ async def cmd_closeall(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     prices = {}
     for pos in paper_trader.positions:
-        p = binance_feed.get_price(pos["symbol"])
+        p = bitget_market.get_price(pos["symbol"])
         if p:
             prices[pos["symbol"]] = p
     closed = paper_trader.close_all(prices)
@@ -475,7 +475,7 @@ async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = paper_trader.get_status()
     prices = {}
     for pos in paper_trader.positions:
-        p = binance_feed.get_price(pos["symbol"])
+        p = bitget_market.get_price(pos["symbol"])
         if p:
             prices[pos["symbol"]] = p
     unrealized = paper_trader.get_unrealized_pnl(prices)
