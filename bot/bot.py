@@ -346,17 +346,44 @@ async def cmd_startbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start auto-scanning."""
     global running_scan
     
-    # Prevent duplicate jobs
-    existing = context.job_queue.get_jobs_by_name("auto_scan")
-    if existing:
-        await update.message.reply_text("⚠️ Auto-scan already running! Use /stopbot first.")
+    if running_scan:
+        await update.message.reply_text("Auto-scan already running! Use /stopbot first.")
         return
     
+    import threading
     running_scan = True
+    interval = config.get("scanner", {}).get("scan_interval_seconds", 300)
     
-    register_scan_job(context.application)
+    def bg_scan_loop():
+        import time as _time
+        while running_scan:
+            try:
+                pairs = config.get("pairs", {})
+                symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
+                results = scanner.scan_multiple(symbols, config["scanner"]["candle_limits"], config["scanner"]["min_score"])
+                print(f"[AutoScan] {len(results)} results", flush=True)
+                if results:
+                    signals = decision.evaluate_batch(results, config, paper_trader.positions, paper_trader.risk_mgr.daily_pnl)
+                    print(f"[AutoScan] {len(signals)} signals", flush=True)
+                    for sig in signals:
+                        trade = paper_trader.open_position(sig)
+                        print(f"[AutoScan] {sig.symbol} {sig.direction} -> {trade.get('type', trade.get('status', '?'))}", flush=True)
+                if paper_trader.positions:
+                    prices = {}
+                    for pos in paper_trader.positions:
+                        p = bitget_market.get_price(pos["symbol"])
+                        if p:
+                            prices[pos["symbol"]] = p
+                    exits = paper_trader.check_exits(prices)
+                    for ex in exits:
+                        print(f"[AutoScan] EXIT: {ex['pair']} {ex['type']} pnl=${ex.get('pnl', 0):.2f}", flush=True)
+            except Exception as e:
+                print(f"[AutoScan] Error: {e}", flush=True)
+            _time.sleep(interval)
     
-    await update.message.reply_text(f"🤖 Auto-scan started! Interval: {interval}s")
+    t = threading.Thread(target=bg_scan_loop, daemon=True)
+    t.start()
+    await update.message.reply_text(f"Auto-scan started! Interval: {interval}s")
 
 
 
@@ -616,12 +643,7 @@ async def cmd_stopbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Stop auto-scanning."""
     global running_scan
     running_scan = False
-    
-    current_jobs = context.job_queue.get_jobs_by_name("auto_scan")
-    for job in current_jobs:
-        job.schedule_removal()
-    
-    await update.message.reply_text("⏹️ Auto-scan stopped.")
+    await update.message.reply_text("Auto-scan stopped.")
 
 
 # ─── Main ────────────────────────────────────────────
@@ -669,8 +691,8 @@ def main():
     print(f"   Paper Balance: ${paper_trader.balance:.2f}")
     print(f"   Leverage: {paper_trader.leverage}x")
     
-    # Auto-start scan if positions exist
-    if paper_trader.positions:
+    # Always auto-start scan
+    if True:
         import threading
         global running_scan
         running_scan = True
