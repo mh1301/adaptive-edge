@@ -3,6 +3,7 @@ Executor — Paper Trading & Live Execution via Bitget API.
 """
 
 import sys
+import json
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -12,16 +13,51 @@ from core import journal, risk_manager
 from data import bitget_feed
 
 
+STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "state.json")
+
 class PaperTrader:
     """Paper trading executor — simulates trades using live market data."""
     
     def __init__(self, initial_balance: float = 1000.0, leverage: int = 15):
-        self.balance = initial_balance
         self.initial_balance = initial_balance
         self.leverage = leverage
         self.positions: List[Dict] = []
+        self.balance = initial_balance
         self.risk_mgr = risk_manager.RiskManager(initial_balance)
-    
+        self._load_state()
+
+    def _save_state(self):
+        """Save state to file for persistence across restarts."""
+        state = {
+            "balance": self.balance,
+            "initial_balance": self.initial_balance,
+            "leverage": self.leverage,
+            "positions": self.positions,
+            "daily_pnl": self.risk_mgr.daily_pnl,
+            "consecutive_losses": self.risk_mgr.consecutive_losses,
+            "trades_today": self.risk_mgr.trades_today,
+        }
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+
+    def _load_state(self):
+        """Load state from file if exists."""
+        if not os.path.exists(STATE_FILE):
+            return
+        try:
+            with open(STATE_FILE) as f:
+                state = json.load(f)
+            self.balance = state.get("balance", self.initial_balance)
+            self.positions = state.get("positions", [])
+            self.risk_mgr.daily_pnl = state.get("daily_pnl", 0)
+            self.risk_mgr.consecutive_losses = state.get("consecutive_losses", 0)
+            self.risk_mgr.trades_today = state.get("trades_today", 0)
+            print(f"[PaperTrader] Loaded state: balance=${self.balance:.2f}, {len(self.positions)} positions")
+        except Exception as e:
+            print(f"[PaperTrader] Failed to load state: {e}")
+
+
     def open_position(self, signal) -> Dict:
         """Open a paper position from a trade signal.
         
@@ -63,6 +99,7 @@ class PaperTrader:
         }
         
         self.positions.append(position)
+        self._save_state()
         # Don't deduct margin from balance — track it separately
         
         # Log entry
@@ -163,6 +200,8 @@ class PaperTrader:
                 remaining.append(pos)
         
         self.positions = remaining
+        if exits:
+            self._save_state()
         return exits
     
 
