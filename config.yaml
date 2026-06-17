@@ -1,0 +1,75 @@
+# Adaptive Edge — AI Crypto Trading Agent
+# Bitget Base Camp Hackathon S1 — Track 1: Trading Agent
+
+# Trading Parameters
+trading:
+  leverage: 15
+  paper_balance: 1000.0
+  entry_per_trade_pct: 2.0        # 2% of equity (Elder's rule)
+  max_positions: 3
+  min_rr: 2.5                      # Minimum risk:reward ratio
+  ideal_rr: 2.8
+  max_daily_loss_pct: 6.0          # 6% circuit breaker
+  max_risk_per_trade_pct: 2.0      # 2% per trade (Elder)
+
+# Scanner Settings
+scanner:
+  scan_interval_seconds: 300       # 5 minutes between full scans
+  min_score: 60                    # Minimum score for entry (0-100)
+  max_coins_to_scan: 32
+  deep_analysis_top: 5             # Deep analysis on top N coins
+  timeframes:
+    htf: "4h"                      # High timeframe for trend
+    mtf: "1h"                      # Medium timeframe for structure
+    ltf: "15m"                     # Low timeframe for entry
+  candle_limits:
+    "4h": 50
+    "1h": 100
+    "15m": 50
+    "1d": 30
+
+# Default Pairs
+pairs:
+  majors: ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+  midcaps: ["SUIUSDT", "ARBUSDT", "OPUSDT", "AVAXUSDT", "NEARUSDT", "APTUSDT", "INJUSDT", "TIAUSDT", "SEIUSDT", "LINKUSDT", "DOTUSDT"]
+  memes: ["DOGEUSDT", "PEPEUSDT", "WIFUSDT", "1000SHIBUSDT"]
+  trending: []  # Dynamically added
+
+# Risk Management (Elder)
+risk:
+  two_percent_rule: true
+  six_percent_rule: true
+  circuit_breaker_losses: 2        # Stop after 2 consecutive losses
+  partial_close_pct: 50            # Close 50% at TP1
+  trailing_stop: true
+  trailing_activation_pct: 1.5     # Activate trailing at 1.5% profit
+  trailing_distance_pct: 1.0       # Trail 1% behind price
+
+# Data Sources
+data:
+  binance_base_url: "https://api.binance.com/api/v3"
+  bitget_base_url: "https://api.bitget.com"
+  cache_ttl_seconds: 60
+
+# Telegram Bot
+telegram:
+  bot_token: ""                    # Set via .env
+  chat_id: ""                      # Set via .env
+  notifications:
+    entry: true
+    exit: true
+    daily_summary: true
+    scan_results: true
+
+# Logging
+logging:
+  level: "INFO"
+  trades_file: "logs/trades.jsonl"
+  performance_file: "logs/performance.json"
+  log_file: "logs/adaptive_edge.log"
+
+# Backtest
+backtest:
+  start_date: "2025-01-01"
+  end_date: "2026-06-17"
+  initial_balance: 1000.0
