@@ -264,7 +264,7 @@ async def auto_scan_task(context: ContextTypes.DEFAULT_TYPE):
     
     try:
         pairs = config.get("pairs", {})
-        symbols = pairs.get("majors", []) + pairs.get("midcaps", [])[:5]
+        symbols = pairs.get("majors", []) + pairs.get("midcaps", []) + pairs.get("memes", [])
         
         results = scanner.scan_multiple(symbols, config["scanner"]["candle_limits"], config["scanner"]["min_score"])
         
