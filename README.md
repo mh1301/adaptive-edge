@@ -1,5 +1,9 @@
 # Adaptive Edge — AI Crypto Trading Agent
 
+<p align="center">
+  <img src="logo.png" alt="Adaptive Edge Logo" width="256">
+</p>
+
 **Bitget Base Camp Hackathon S1 — Track 1: Trading Agent**
 
 ## Quick Start
