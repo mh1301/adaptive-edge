@@ -72,6 +72,12 @@ class PaperTrader:
         if not can_trade:
             return {"status": "REJECTED", "reason": reason}
         
+        # Check total margin usage
+        total_margin = sum(p.get("margin", 0) for p in self.positions)
+        available = self.balance - total_margin
+        if available < self.balance * 0.05:  # Keep 5% reserve
+            return {"status": "REJECTED", "reason": "Insufficient available margin"}
+        
         # Calculate margin
         margin = signal.entry_price * signal.size / self.leverage
         if margin > self.balance * 0.5:  # Don't use more than 50% of balance
