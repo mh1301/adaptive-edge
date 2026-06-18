@@ -700,6 +700,10 @@ def main():
         
         def bg_scan_loop():
             import time as _time
+            nonlocal _scan_thread_started
+            if _scan_thread_started:
+                return
+            _scan_thread_started = True
             while running_scan:
                 try:
                     pairs = config.get("pairs", {})
